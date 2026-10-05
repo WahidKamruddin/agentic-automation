@@ -1,32 +1,53 @@
-function sendReminder() {
-    console.log("Sending reminder...");
-  }
-  
-  function runTask(task: () => void, intervalMs: number) {
-    let count = 0;
-  
-    const interval = setInterval(() => {
-      count++;
-      task();
-  
-      if (count >= 5) {
-        clearInterval(interval);
-      }
-    }, intervalMs);
-  }
-  
-  const tasks = [
-    {
-      name: "Reminder",
-      task: sendReminder,
-      intervalMs: 3000,
-    },
-  ];
-  
-  function startScheduler() {
-    for (const task of tasks) {
-      runTask(task.task, task.intervalMs);
-    }
-  }
+import cron from "node-cron";
 
-  startScheduler();
+type Task = {
+  name: string;
+  task: () => Promise<void>;
+  schedule: string;
+};
+
+async function sendReminder() {
+  console.log("Sending reminder...");
+}
+
+async function generateReport() {
+  console.log("Generating report...");
+}
+
+function runTask(
+  name: string,
+  task: () => Promise<void>,
+  schedule: string
+) {
+  cron.schedule(schedule, async () => {
+    console.log(`Running task: ${name}`);
+
+    try {
+      await task();
+      console.log(`Task succeeded: ${name}`);
+    } catch (error) {
+      console.error(`Task failed: ${name}`, error);
+    }
+  });
+}
+
+const tasks: Task[] = [
+  {
+    name: "Reminder",
+    task: sendReminder,
+    schedule: "*/5 * * * * *",
+  },
+  {
+    name: "Report",
+    task: generateReport,
+    schedule: "*/10 * * * * *",
+  },
+];
+
+function startScheduler() {
+  for (const task of tasks) {
+    runTask(task.name, task.task, task.schedule);
+  }
+}
+
+startScheduler();
