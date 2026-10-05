@@ -1,10 +1,13 @@
 import cron from "node-cron";
 
 type Task = {
+  id: string;
   name: string;
   task: () => Promise<void>;
   schedule: string;
 };
+
+type TaskStatus = "scheduled" | "running" | "succeeded" | "failed";
 
 async function sendReminder() {
   console.log("Sending reminder...");
@@ -14,39 +17,57 @@ async function generateReport() {
   console.log("Generating report...");
 }
 
-function runTask(
-  name: string,
-  task: () => Promise<void>,
-  schedule: string
-) {
-  cron.schedule(schedule, async () => {
-    console.log(`Running task: ${name}`);
+const taskRegistry = new Map<string, Task>([
+  [
+    "reminder",
+    {
+      id: "reminder",
+      name: "Reminder",
+      task: sendReminder,
+      schedule: "*/5 * * * * *",
+    },
+  ],
+  [
+    "report",
+    {
+      id: "report",
+      name: "Report",
+      task: generateReport,
+      schedule: "*/10 * * * * *",
+    },
+  ],
+]);
 
-    try {
-      await task();
-      console.log(`Task succeeded: ${name}`);
-    } catch (error) {
-      console.error(`Task failed: ${name}`, error);
-    }
+async function executeTask(task: Task) {
+  console.log(`Running task: ${task.name}`);
+
+  try {
+    await task.task();
+    console.log(`Task succeeded: ${task.name}`);
+  } catch (error) {
+    console.error(`Task failed: ${task.name}`, error);
+  }
+}
+
+function runTask(task: Task) {
+  cron.schedule(task.schedule, async () => {
+    await executeTask(task);
   });
 }
 
-const tasks: Task[] = [
-  {
-    name: "Reminder",
-    task: sendReminder,
-    schedule: "*/5 * * * * *",
-  },
-  {
-    name: "Report",
-    task: generateReport,
-    schedule: "*/10 * * * * *",
-  },
-];
+async function dispatchTask(id: string) {
+  const task = taskRegistry.get(id);
+
+  if (!task) {
+    throw new Error(`Task not found: ${id}`);
+  }
+
+  await executeTask(task);
+}
 
 function startScheduler() {
-  for (const task of tasks) {
-    runTask(task.name, task.task, task.schedule);
+  for (const task of taskRegistry.values()) {
+    runTask(task);
   }
 }
 
